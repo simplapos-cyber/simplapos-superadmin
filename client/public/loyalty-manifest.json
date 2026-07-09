@@ -1,0 +1,24 @@
+{
+  "name": "Meine Treuekarte",
+  "short_name": "Treuekarte",
+  "description": "Meine persönliche Treuekarte – Punkte sammeln und Prämien einlösen",
+  "start_url": "/loyalty/",
+  "display": "standalone",
+  "background_color": "#7c3aed",
+  "theme_color": "#7c3aed",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/manus-storage/loyalty-icon-192_d3faf58d.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/manus-storage/loyalty-icon-512_243d968d.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

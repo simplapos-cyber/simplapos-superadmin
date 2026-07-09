@@ -1,0 +1,57 @@
+{
+  "name": "SimplaPOS – Kassensystem",
+  "short_name": "SimplaPOS",
+  "description": "Das moderne Kassensystem für Schweizer Gastronomen – Cloud-POS, Speisekarte, Küchenmonitor und mehr.",
+  "id": "/?source=pwa",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "de-CH",
+  "categories": ["business", "productivity", "food"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Betrieb",
+      "short_name": "Betrieb",
+      "description": "Tischplan und Bestellungen",
+      "url": "/admin/betrieb",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Kellner",
+      "short_name": "Kellner",
+      "description": "Kellner-Dashboard",
+      "url": "/kellner",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}

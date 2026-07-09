@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="de">
+
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+    <title>SimplaPOS – Kassensystem</title>
+    <meta name="description" content="Das moderne Kassensystem für Schweizer Gastronomen – Cloud-POS, Speisekarte, Küchenmonitor und mehr." />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Theme Color (Statusleiste auf Android/iOS) -->
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="msapplication-TileColor" content="#0f172a" />
+    <meta name="msapplication-TileImage" content="/icon-144.png" />
+
+    <!-- iOS PWA ("Zum Home-Bildschirm hinzufügen") -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SimplaPOS" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icon-152.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+
+    <!-- iOS Splash Screens: dark navy background + transparent logo (no white box) -->
+    <!-- iPhone 8 / SE 2nd gen (750x1334) -->
+    <link rel="apple-touch-startup-image"
+      media="screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+      href="/manus-storage/splash-iphone-8_fab9979d.png" />
+    <!-- iPhone XR (828x1792) -->
+    <link rel="apple-touch-startup-image"
+      media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+      href="/manus-storage/splash-iphone-xr_19562465.png" />
+    <!-- iPhone SE 3rd gen / 13 mini (1080x2340) -->
+    <link rel="apple-touch-startup-image"
+      media="screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+      href="/manus-storage/splash-iphone-se_9d2b247b.png" />
+    <!-- iPhone 14 / 15 (1170x2532) -->
+    <link rel="apple-touch-startup-image"
+      media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+      href="/manus-storage/splash-iphone-14_476d4cdc.png" />
+    <!-- iPhone 14 Pro / 15 Pro (1179x2556) -->
+    <link rel="apple-touch-startup-image"
+      media="screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+      href="/manus-storage/splash-iphone-14-pro_708abe54.png" />
+    <!-- iPhone 14 Pro Max / 15 Pro Max (1284x2778) -->
+    <link rel="apple-touch-startup-image"
+      media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+      href="/manus-storage/splash-iphone-14-pro-max_fd63e3cf.png" />
+    <!-- iPad mini / Air (1536x2048) -->
+    <link rel="apple-touch-startup-image"
+      media="screen and (device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+      href="/manus-storage/splash-ipad-air_57c0416f.png" />
+    <!-- iPad Pro 11" (1668x2388) -->
+    <link rel="apple-touch-startup-image"
+      media="screen and (device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+      href="/manus-storage/splash-ipad-pro-11_7acb2cf6.png" />
+    <!-- iPad Pro 12.9" (2048x2732) -->
+    <link rel="apple-touch-startup-image"
+      media="screen and (device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+      href="/manus-storage/splash-ipad-pro-12.9_2e884580.png" />
+
+    <!-- Android / Chrome PWA -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icon-96.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        // Sofort registrieren (nicht auf 'load' warten) damit SW schneller aktiv wird
+        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+          .then(function(reg) {
+            reg.update();
+            // Nach Aktivierung: geladene Assets an SW zum Cachen senden
+            function cacheCurrentAssets(worker) {
+              if (!worker) return;
+              var assets = [];
+              document.querySelectorAll('script[src]').forEach(function(el) {
+                if (el.src && el.src.startsWith(window.location.origin)) assets.push(el.src);
+              });
+              document.querySelectorAll('link[rel=stylesheet]').forEach(function(el) {
+                if (el.href && el.href.startsWith(window.location.origin)) assets.push(el.href);
+              });
+              if (assets.length > 0) {
+                worker.postMessage({ type: 'CACHE_URLS', urls: assets });
+              }
+            }
+            // Wenn SW bereits aktiv: sofort cachen
+            if (reg.active) cacheCurrentAssets(reg.active);
+            // Wenn neuer SW installiert wird: nach Aktivierung cachen
+            reg.addEventListener('updatefound', function() {
+              var newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', function() {
+                  if (newWorker.state === 'activated') cacheCurrentAssets(newWorker);
+                });
+              }
+            });
+          })
+          .catch(function() {});
+      }
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <!-- Epson ePOS SDK für direkten Netzwerkdruck -->
+    <script src="/epos-2.27.0.js"></script>
+    <script type="module" src="/src/main.tsx"></script>
+    <script
+      defer
+      src="%VITE_ANALYTICS_ENDPOINT%/umami"
+      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+  </body>
+
+</html>

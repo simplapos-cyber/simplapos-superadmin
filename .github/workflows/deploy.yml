@@ -1,0 +1,85 @@
+name: Deploy to Hetzner
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: pnpm installieren
+        run: npm install -g pnpm
+
+      - name: Dependencies installieren
+        run: pnpm install --frozen-lockfile
+
+      - name: Produktions-Build erstellen
+        run: pnpm run build
+
+      - name: Build-Artefakte packen
+        run: |
+          tar -czf simplapos-deploy.tar.gz \
+            dist/ \
+            server/ \
+            shared/ \
+            drizzle/ \
+            package.json \
+            pnpm-lock.yaml \
+            tsconfig.json \
+            vite.config.ts
+          ls -lh simplapos-deploy.tar.gz
+
+      - name: Auf Hetzner übertragen
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          source: "simplapos-deploy.tar.gz"
+          target: "/tmp/"
+
+      - name: App auf Hetzner deployen und neu starten
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            set -e
+            APP_DIR="/var/www/simplapos"
+            
+            echo "📦 Deploye nach $APP_DIR..."
+            
+            # Backup des aktuellen dist
+            cp -r "$APP_DIR/dist" "$APP_DIR/dist.bak.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+            
+            # Altes Backup aufräumen (nur letztes behalten)
+            ls -dt "$APP_DIR"/dist.bak.* 2>/dev/null | tail -n +2 | xargs rm -rf 2>/dev/null || true
+            
+            # Neuen Build entpacken
+            cd "$APP_DIR"
+            tar -xzf /tmp/simplapos-deploy.tar.gz
+            
+            # Dependencies installieren (inkl. devDependencies wegen vite)
+            pnpm install --frozen-lockfile
+            
+            # App neu starten
+            pm2 restart simplapos --update-env
+            
+            # Status prüfen
+            sleep 3
+            pm2 status simplapos
+            
+            echo "✅ Deployment erfolgreich abgeschlossen!"

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SimplaPOS Print-Agent</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; min-height: 100vh; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; }
+    .header { text-align: center; margin-bottom: 30px; }
+    .header h1 { font-size: 24px; color: #1e293b; margin-bottom: 8px; }
+    .header p { color: #64748b; font-size: 14px; }
+    .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .card h2 { font-size: 18px; color: #1e293b; margin-bottom: 16px; }
+    .status-indicator { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .status-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .status-dot.connected { background: #22c55e; animation: pulse 2s infinite; }
+    .status-dot.disconnected { background: #ef4444; }
+    .status-dot.waiting { background: #f59e0b; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .status-text { font-size: 16px; font-weight: 600; color: #1e293b; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: #64748b; }
+    .info-value { color: #1e293b; font-weight: 500; }
+    label { display: block; font-size: 14px; color: #64748b; margin-bottom: 6px; }
+    input[type="text"] { width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 16px; margin-bottom: 16px; }
+    input[type="text"]:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+    .btn { display: block; width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-primary { background: #6366f1; color: white; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-danger { background: #ef4444; color: white; margin-bottom: 20px; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-secondary { background: #f1f5f9; color: #1e293b; margin-top: 10px; }
+    .btn-secondary:hover { background: #e2e8f0; }
+    .log-entries { max-height: 300px; overflow-y: auto; }
+    .log-entry { padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; font-size: 13px; font-family: monospace; }
+    .log-entry.success { background: #f0fdf4; color: #166534; }
+    .log-entry.error { background: #fef2f2; color: #991b1b; }
+    .log-entry.info { background: #f0f9ff; color: #1e40af; }
+    .hidden { display: none; }
+    .warning { background: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: #92400e; }
+    .cert-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .cert-box h3 { font-size: 15px; color: #0c4a6e; margin-bottom: 10px; }
+    .cert-box ol { padding-left: 20px; font-size: 13px; color: #0369a1; line-height: 1.8; }
+    .cert-link { display: inline-block; padding: 8px 16px; background: #0ea5e9; color: white; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; margin-top: 8px; }
+    .cert-link:hover { background: #0284c7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>&#128424; SimplaPOS Print-Agent</h1>
+      <p>Dieser Tab muss geöffnet bleiben, damit Bons gedruckt werden.</p>
+    </div>
+
+    <!-- Setup (shown when no token) -->
+    <div id="setup-view" class="card">
+      <h2>Verbindung einrichten</h2>
+      <p style="font-size: 14px; color: #64748b; margin-bottom: 16px;">
+        Geben Sie den Token ein, den Sie in SimplaPOS unter Drucker &rarr; Print-Agent erhalten haben.
+      </p>
+      <label for="token-input">Print-Agent Token</label>
+      <input type="text" id="token-input" placeholder="Token einfügen..." autocomplete="off" />
+      <button class="btn btn-primary" id="connect-btn">Verbinden</button>
+    </div>
+
+    <!-- Status (shown when connected) -->
+    <div id="status-view" class="hidden">
+
+      <!-- Zertifikats-Anleitung (nur beim ersten Mal) -->
+      <div id="cert-guide" class="cert-box hidden">
+        <h3>&#128274; Einmalige Drucker-Freigabe erforderlich</h3>
+        <p style="font-size: 13px; color: #0369a1; margin-bottom: 10px;">
+          Ihr Drucker hat ein eigenes Sicherheitszertifikat. Bitte öffnen Sie den Drucker einmalig im Browser und bestätigen Sie die Sicherheitswarnung:
+        </p>
+        <ol>
+          <li>Klicken Sie auf den Link unten</li>
+          <li>Klicken Sie auf "Erweitert" oder "Details"</li>
+          <li>Klicken Sie auf "Trotzdem fortfahren" / "Diesem Gerät vertrauen"</li>
+          <li>Schliessen Sie das Tab und kehren Sie hierher zurück</li>
+        </ol>
+        <a id="cert-link" href="#" target="_blank" class="cert-link">&#128279; Drucker-Zertifikat freigeben</a>
+        <button class="btn btn-secondary" id="retry-after-cert-btn">&#8635; Erneut versuchen (nach Freigabe)</button>
+      </div>
+
+      <div class="card">
+        <div class="status-indicator">
+          <div class="status-dot" id="status-dot"></div>
+          <span class="status-text" id="status-text">Verbinde...</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Letzte Abfrage</span>
+          <span class="info-value" id="last-poll">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Gedruckte Bons</span>
+          <span class="info-value" id="print-count">0</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Fehler</span>
+          <span class="info-value" id="error-count">0</span>
+        </div>
+      </div>
+
+      <div class="warning">
+        &#9888;&#65039; Bitte lassen Sie diesen Tab geöffnet. Wenn Sie ihn schliessen, werden keine Bons mehr gedruckt.
+      </div>
+
+      <button class="btn btn-danger" id="disconnect-btn">Verbindung trennen</button>
+
+      <div class="card">
+        <h2>Druckprotokoll</h2>
+        <div class="log-entries" id="log-entries">
+          <div class="log-entry info">Print-Agent bereit...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── STATE ───────────────────────────────────────────────────────────────
+    var token = localStorage.getItem('simplapos-print-agent-token') || '';
+    var pollInterval = null;
+    var printCount = 0;
+    var errorCount = 0;
+    var API_BASE = window.location.origin;
+    var POLL_INTERVAL_MS = 3000;
+    var isPolling = false;
+    var lastKnownPrinterIp = null;
+
+    // ─── DOM READY ───────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('connect-btn').addEventListener('click', connect);
+      document.getElementById('disconnect-btn').addEventListener('click', disconnect);
+      document.getElementById('retry-after-cert-btn').addEventListener('click', function() {
+        document.getElementById('cert-guide').classList.add('hidden');
+        poll();
+      });
+
+      // Auto-connect from URL hash (#token=...) or localStorage
+      var hashToken = '';
+      if (window.location.hash && window.location.hash.indexOf('token=') !== -1) {
+        hashToken = decodeURIComponent(window.location.hash.replace('#token=', ''));
+        if (hashToken) {
+          token = hashToken;
+          localStorage.setItem('simplapos-print-agent-token', token);
+          // Clean URL
+          history.replaceState(null, '', window.location.pathname);
+        }
+      }
+      if (token) {
+        document.getElementById('token-input').value = token;
+        document.getElementById('setup-view').classList.add('hidden');
+        document.getElementById('status-view').classList.remove('hidden');
+        startPolling();
+      }
+    });
+
+    // ─── CONNECT ─────────────────────────────────────────────────────────────
+    function connect() {
+      var input = document.getElementById('token-input');
+      var val = input.value.trim();
+      if (!val) { alert('Bitte Token eingeben'); return; }
+      token = val;
+      localStorage.setItem('simplapos-print-agent-token', token);
+      document.getElementById('setup-view').classList.add('hidden');
+      document.getElementById('status-view').classList.remove('hidden');
+      startPolling();
+    }
+
+    function disconnect() {
+      token = '';
+      localStorage.removeItem('simplapos-print-agent-token');
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+      document.getElementById('setup-view').classList.remove('hidden');
+      document.getElementById('status-view').classList.add('hidden');
+      document.getElementById('cert-guide').classList.add('hidden');
+    }
+
+    // ─── POLLING ─────────────────────────────────────────────────────────────
+    function startPolling() {
+      setStatus('connected', 'Verbunden – warte auf Druckaufträge...');
+      addLog('info', 'Print-Agent verbunden. Polling gestartet.');
+      poll();
+      pollInterval = setInterval(poll, POLL_INTERVAL_MS);
+    }
+
+    function poll() {
+      if (isPolling) return;
+      isPolling = true;
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', API_BASE + '/api/print-agent/poll?token=' + encodeURIComponent(token), true);
+      xhr.timeout = 15000;
+
+      xhr.onload = function() {
+        isPolling = false;
+        if (xhr.status === 401) {
+          setStatus('disconnected', 'Token ungültig!');
+          addLog('error', 'Token ungültig. Bitte neu verbinden.');
+          clearInterval(pollInterval); pollInterval = null;
+          return;
+        }
+        if (xhr.status !== 200) {
+          setStatus('waiting', 'Server-Fehler (HTTP ' + xhr.status + ')');
+          return;
+        }
+        try {
+          var data = JSON.parse(xhr.responseText);
+          document.getElementById('last-poll').textContent = new Date().toLocaleTimeString('de-CH');
+          if (data.jobs && data.jobs.length > 0) {
+            setStatus('connected', 'Verbunden – ' + data.jobs.length + ' Aufträge werden verarbeitet...');
+            processJobs(data.jobs);
+          } else {
+            setStatus('connected', 'Verbunden – warte auf Druckaufträge...');
+          }
+        } catch (e) {
+          addLog('error', 'JSON-Parse-Fehler: ' + e.message);
+        }
+      };
+
+      xhr.onerror = function() {
+        isPolling = false;
+        setStatus('waiting', 'Verbindung unterbrochen...');
+      };
+      xhr.ontimeout = function() {
+        isPolling = false;
+        setStatus('waiting', 'Timeout – versuche erneut...');
+      };
+      xhr.send();
+    }
+
+    // ─── PROCESS PRINT JOBS ──────────────────────────────────────────────────
+    function processJobs(jobs) {
+      var i = 0;
+      function next() {
+        if (i >= jobs.length) return;
+        var job = jobs[i++];
+        processJob(job, next);
+      }
+      next();
+    }
+
+    function processJob(job, callback) {
+      if (!job.printer || !job.printer.ip) {
+        ackJob(job.id, 'failed', 'Keine Drucker-IP konfiguriert');
+        addLog('error', 'Job #' + job.id + ': Keine Drucker-IP');
+        errorCount++; updateCounts();
+        if (callback) callback();
+        return;
+      }
+
+      var printerIp = job.printer.ip;
+      lastKnownPrinterIp = printerIp;
+
+      try {
+        var payload = JSON.parse(job.payload);
+        if (payload.type === 'epos-xml') {
+          printEposXmlHttps(printerIp, payload.xml, function(err) {
+            if (err) {
+              // Check if it's a certificate/network error
+              if (err.indexOf('cert') !== -1 || err.indexOf('Netzwerk') !== -1 || err.indexOf('network') !== -1 || err.indexOf('erreichbar') !== -1) {
+                showCertGuide(printerIp);
+                ackJob(job.id, 'failed', err);
+                addLog('error', 'Zertifikat nicht freigegeben – Anleitung wird angezeigt');
+              } else {
+                ackJob(job.id, 'failed', err);
+                addLog('error', 'Job #' + job.id + ' fehlgeschlagen: ' + err);
+              }
+              errorCount++;
+            } else {
+              ackJob(job.id, 'printed', null);
+              addLog('success', '\u2713 Job #' + job.id + ' (' + job.jobType + ') an ' + job.printer.name + ' gedruckt');
+              printCount++;
+              document.getElementById('cert-guide').classList.add('hidden');
+            }
+            updateCounts();
+            if (callback) callback();
+          });
+        } else {
+          ackJob(job.id, 'failed', 'Format nicht unterstützt: ' + payload.type);
+          errorCount++; updateCounts();
+          if (callback) callback();
+        }
+      } catch (e) {
+        ackJob(job.id, 'failed', e.message);
+        addLog('error', 'Job #' + job.id + ' Fehler: ' + e.message);
+        errorCount++; updateCounts();
+        if (callback) callback();
+      }
+    }
+
+    // ─── EPSON ePOS PRINT ────────────────────────────────────────────────────
+    // Epson TM-m30II hört auf Port 80 (HTTP) für ePOS-Print – genau wie qrorpa.ch.
+    // Reihenfolge: HTTP:80 → HTTP:8008 → HTTPS:8043 → HTTPS:443
+    function printEposXmlHttps(printerIp, xmlContent, callback) {
+      // 1. HTTP Port 80 (Standard – wie qrorpa.ch)
+      tryPrintWithUrl(
+        'http://' + printerIp + '/cgi-bin/epos/service.cgi?devid=local_printer&timeout=60000',
+        xmlContent,
+        function(err1) {
+          if (!err1) { callback(null); return; }
+          // 2. HTTP Port 8008
+          tryPrintWithUrl(
+            'http://' + printerIp + ':8008/cgi-bin/epos/service.cgi?devid=local_printer&timeout=60000',
+            xmlContent,
+            function(err2) {
+              if (!err2) { callback(null); return; }
+              // 3. HTTPS Port 8043
+              tryPrintWithUrl(
+                'https://' + printerIp + ':8043/cgi-bin/epos/service.cgi?devid=local_printer&timeout=60000',
+                xmlContent,
+                function(err3) {
+                  if (!err3) { callback(null); return; }
+                  // 4. HTTPS Port 443
+                  tryPrintWithUrl(
+                    'https://' + printerIp + '/cgi-bin/epos/service.cgi?devid=local_printer&timeout=60000',
+                    xmlContent,
+                    function(err4) {
+                      if (!err4) { callback(null); return; }
+                      callback('Drucker nicht erreichbar. Versucht: HTTP:80, HTTP:8008, HTTPS:8043, HTTPS:443. Letzter Fehler: ' + err4);
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+
+    function tryPrintWithUrl(url, xmlContent, callback) {
+      var soapBody = '<?xml version="1.0" encoding="utf-8"?>' +
+        '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">' +
+        '<s:Body>' + xmlContent + '</s:Body></s:Envelope>';
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.setRequestHeader('Content-Type', 'text/xml; charset=utf-8');
+      xhr.setRequestHeader('SOAPAction', '""');
+      xhr.timeout = 8000;
+
+      xhr.onload = function() {
+        if (xhr.status === 200 && xhr.responseText.indexOf('success="true"') !== -1) {
+          addLog('info', 'Gedruckt via: ' + url);
+          callback(null);
+        } else if (xhr.status === 200) {
+          var match = xhr.responseText.match(/code="([^"]+)"/);
+          callback('Drucker-Fehler: ' + (match ? match[1] : xhr.responseText.substring(0, 100)));
+        } else {
+          callback('HTTP ' + xhr.status + ' von ' + url);
+        }
+      };
+      xhr.onerror = function() { callback('Netzwerkfehler bei ' + url); };
+      xhr.ontimeout = function() { callback('Timeout bei ' + url); };
+      xhr.send(soapBody);
+    }
+
+    // ─── CERT GUIDE ──────────────────────────────────────────────────────────
+    function showCertGuide(printerIp) {
+      var guide = document.getElementById('cert-guide');
+      var link = document.getElementById('cert-link');
+      // Open the printer's HTTPS page so user can accept the certificate
+      link.href = 'https://' + printerIp + ':8043/';
+      guide.classList.remove('hidden');
+      addLog('info', 'Bitte Drucker-Zertifikat freigeben: https://' + printerIp + ':8043/');
+    }
+
+    // ─── ACK JOB ─────────────────────────────────────────────────────────────
+    function ackJob(jobId, status, errorMessage) {
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', API_BASE + '/api/print-agent/ack?token=' + encodeURIComponent(token), true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify({ jobId: jobId, status: status, errorMessage: errorMessage || null }));
+      } catch (e) { /* best-effort */ }
+    }
+
+    // ─── UI HELPERS ──────────────────────────────────────────────────────────
+    function setStatus(type, text) {
+      document.getElementById('status-dot').className = 'status-dot ' + type;
+      document.getElementById('status-text').textContent = text;
+    }
+
+    function updateCounts() {
+      document.getElementById('print-count').textContent = printCount;
+      document.getElementById('error-count').textContent = errorCount;
+    }
+
+    function addLog(type, message) {
+      var container = document.getElementById('log-entries');
+      var entry = document.createElement('div');
+      entry.className = 'log-entry ' + type;
+      entry.textContent = '[' + new Date().toLocaleTimeString('de-CH') + '] ' + message;
+      container.insertBefore(entry, container.firstChild);
+      while (container.children.length > 50) container.removeChild(container.lastChild);
+    }
+  </script>
+</body>
+</html>
